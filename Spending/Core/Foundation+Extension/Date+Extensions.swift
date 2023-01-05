@@ -84,4 +84,22 @@ extension Date {
         let iso8601String = dateFormatter.string(from: self)
         return iso8601String
     }
+    
+    var humanReadableTime: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "h:mm a"
+        dateFormatter.amSymbol = "am"
+        dateFormatter.pmSymbol = "pm"
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        let iso8601String = dateFormatter.string(from: self)
+        return iso8601String
+    }
+    
+    var humanReadableSecond: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "ss"
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        let iso8601String = dateFormatter.string(from: self)
+        return iso8601String
+    }
 }

@@ -12,6 +12,22 @@ protocol DataEnterable {
     
 }
 
+enum HighLightColor: Int {
+    case red, blue, orange, green, purple, cyan, mint, gray
+    func color() -> UIColor {
+        switch self {
+        case .red: return .systemRed
+        case .blue: return .link
+        case .orange: return .systemOrange
+        case .green: return .systemGreen
+        case .purple: return .systemPurple
+        case .cyan: return .systemCyan
+        case .mint: return .systemMint
+        case .gray: return .systemGray
+        }
+    }
+}
+
 class PaymentCell: UICollectionViewCell {
     static let reuseIdentifier = "PaymentCell"
     
@@ -86,7 +102,8 @@ class PaymentCell: UICollectionViewCell {
                 amountMoney.textColor = .systemRed
             }
         }
-        time.text = payment.dateTime.description
+        time.text = payment.dateTime.humanReadableTime
+        iconBackGround.borderOutline(2, color: (HighLightColor(rawValue: (Int(payment.dateTime.humanReadableSecond) ?? 0) % 8)!.color()))
         paymentMethod.text = payment.paymentMethod.rawValue
     }
     
