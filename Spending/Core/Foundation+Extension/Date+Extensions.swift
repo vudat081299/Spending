@@ -76,4 +76,12 @@ extension Date {
         let iso8601String = dateFormatter.string(from: self)
         return iso8601String
     }
+    
+    var humanReadableDate: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM dd, YYYY"
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        let iso8601String = dateFormatter.string(from: self)
+        return iso8601String
+    }
 }

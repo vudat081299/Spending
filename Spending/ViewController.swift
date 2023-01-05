@@ -7,107 +7,7 @@
 
 import UIKit
 
-//extension Array: Codable where Element == Payments.Payment {
-//    typealias Payment = Payments.Payment
-//
-//    struct PaymentKey: CodingKey {
-//        var stringValue: String
-//        init?(stringValue: String) {
-//            self.stringValue = stringValue
-//        }
-//
-//        var intValue: Int? { return nil }
-//        init?(intValue: Int) { return nil }
-//
-//        static let icon = PaymentKey(stringValue: "icon")!
-//        static let type = PaymentKey(stringValue: "type")!
-//        static let note = PaymentKey(stringValue: "note")!
-//        static let dateTime = PaymentKey(stringValue: "dateTime")!
-//        static let amountMoney = PaymentKey(stringValue: "amountMoney")!
-//        static let paymentMethod = PaymentKey(stringValue: "paymentMethod")!
-//    }
-//
-//    init(payments: [Payment] = []) {
-//        self = payments
-//    }
-//
-//    func encode(to encoder: Encoder) throws {
-//        var container = encoder.container(keyedBy: PaymentKey.self)
-//
-//        for payment in self {
-//            // Any product's `name` can be used as a key name.
-//            let dateTimeKey = PaymentKey(stringValue: payment.dateTime.description)!
-//            var productContainer = container.nestedContainer(keyedBy: PaymentKey.self, forKey: dateTimeKey)
-//
-//            // The rest of the keys use static names defined in `ProductKey`.
-//            try productContainer.encode(payment.icon, forKey: .icon)
-//            try productContainer.encode(payment.type, forKey: .type)
-//            try productContainer.encode(payment.note, forKey: .note)
-//            try productContainer.encode(payment.amountMoney, forKey: .amountMoney)
-//            try productContainer.encode(payment.paymentMethod.rawValue, forKey: .paymentMethod)
-//        }
-//    }
-//
-//    internal init(from decoder: Decoder) throws {
-//        var payments = [Payment]()
-//        let container = try decoder.container(keyedBy: PaymentKey.self)
-//        for key in container.allKeys {
-//            // Note how the `key` in the loop above is used immediately to access a nested container.
-//            let productContainer = try container.nestedContainer(keyedBy: PaymentKey.self, forKey: key)
-//            let icon = try productContainer.decode(String.self, forKey: .icon)
-//            let type = try productContainer.decodeIfPresent(String.self, forKey: .type)
-//            let note = try productContainer.decode(String.self, forKey: .note)
-//            let amountMoney = try productContainer.decodeIfPresent(String.self, forKey: .amountMoney)
-//            let paymentMethod = try productContainer.decode(String.self, forKey: .paymentMethod)
-//
-//            // The key is used again here and completes the collapse of the nesting that existed in the JSON representation.
-//            let payment = Payment(icon: icon, type: type, note: note, dateTime: key.stringValue.toDate(), amountMoney: amountMoney, paymentMethod: Payment.PaymentMethod(rawValue: paymentMethod) ?? .none)
-//            payments.append(payment)
-//        }
-//        self.init(payments: payments)
-//    }
-//
-//
-//
-//
-//
-//
-//    // Store an Array of Payments
-//    func store() {
-//        do {
-//            let data = try PropertyListEncoder().encode(["a"])
-//            try NSKeyedArchiver.archivedData(withRootObject: data, requiringSecureCoding: false)
-//
-//            let success = NSKeyedArchiver.archiveRootObject(data, toFile: productsFile.path)
-//        } catch {
-//            print("Store payments failed! \(error)")
-//        }
-//    }
-//
-//    // Retrieve an Array of Payments
-//    func retrieve() -> [Payment] {
-//        var paymentStorageFilePath: URL = {
-//            let docDir = try! FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-//            return docDir.appendingPathComponent("PaymentsStorage.plist")
-//        }()
-////        try NSKeyedUnarchiver.unarchivedObject(ofClass: <#T##NSCoding.Protocol#>, from: <#T##Data#>)
-//        guard let data = NSKeyedUnarchiver.unarchiveObject(withFile: paymentStorageFilePath.path) as? Data else { return [] }
-//        do {
-//            let payments = NSKeyedUnarchiver.unarchivedArrayOfObjects(ofClass: Payment, from: data)
-////            let payments = try PropertyListDecoder().decode([Payment].self, from: data)
-//            return payments
-//        } catch {
-//            print("Retrieve Failed")
-//            return []
-//        }
-//    }
-//}
-
 class ViewController: UIViewController {
-    
-    static let headerElementKind = "header-element-kind"
-    @IBOutlet weak var collectionView: UICollectionView!
-    
     /// - Tag: OrthogonalBehavior
     enum SectionKind: Int, CaseIterable {
         case none, continuous, continuousGroupLeadingBoundary, paging, groupPaging, groupPagingCentered
@@ -128,195 +28,390 @@ class ViewController: UIViewController {
             }
         }
     }
-    var dataSource: UICollectionViewDiffableDataSource<Int, Int>! = nil
+    
+    
+    
+    // MARK: -
+    static let headerElementKind = "header-element-kind"
+    static let footerElementKind = "footer-element-kind"
+    @IBOutlet weak var collectionView: UICollectionView!
+    var dataSource: UICollectionViewDiffableDataSource<Int, Payment>! = nil
     
     
     
     // MARK: - Data
-    let payments = Payments.retrieve()
-
+    var groupedPaymentsDictionary: Dictionary<String, [Payment]>!
+    
+    /// Use to apply snapshot
+    var sortedGroupedPaymentsDictionary: [Dictionary<String, [Payment]>.Element]! /// sorted by key (dateTime value)
+    var groupedPaymentsArray: [[Payment]] = [] /// remove key from sortedGroupedPaymentsDictionary
+    var flatPaymentsArray: [Payment] = [] /// flatten groupedPaymentsArray
+    var numberOfSectionsInADateArray: [Int] = [] /// count elements in groupedPaymentsArray
+    var headerIndexes: [Int] = []
+    var footerIndexes: [Int] = []
+    
+    
+    
+    // MARK: - App default configuration
     override var prefersStatusBarHidden: Bool {
         return true
     }
     
+    
+    
+    // MARK: - Life cycle
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
-        navigationItem.title = "Orthogonal Section Behaviors"
+//        sample()
+        prepareNavigationViewController()
+        prepareData()
         configureHierarchy()
         configureDataSource()
+        applySnapshot()
+    }
+    
+    
+    func prepareNavigationViewController() {
+        title = "Spending"
+        self.navigationController?.navigationBar.prefersLargeTitles = true
+        self.navigationController?.navigationBar.sizeToFit()
+        self.navigationController?.navigationItem.largeTitleDisplayMode = .always
         
-        // MARK: - Sample usage Payments storage engine
-//        let store = Payments(payments: [
-//            .init(icon: "car", type: "borrow", note: "Buy my new car", dateTime: Date(), amountMoney: "2000", paymentMethod: .cash),
-//            .init(icon: "☕️", type: "Highland", note: "With my friend", dateTime: "2022-12-28 17:30:22 +0000".toDate(), amountMoney: "20", paymentMethod: .card),
-//            .init(icon: "☕️", type: "Starbuck", note: "With my boss", dateTime: "2022-12-28 17:30:21 +0000".toDate(), amountMoney: "30", paymentMethod: .cash),
-//            .init(icon: "🍕", type: "breakfast", note: "Delecious", dateTime: "2022-12-28 17:30:25 +0000".toDate(), amountMoney: "30", paymentMethod: .cash),
-//            .init(icon: "📓", type: "EC", note: "At Uni", dateTime: "2022-12-28 17:30:20 +0000".toDate(), amountMoney: "20", paymentMethod: .cash)
-//        ])
-//        store.store()
-//        let payments = Payments.retrieve()
-//        for payment in payments.payments {
-//            let paymentMethod = payment.paymentMethod
-//            let dateTime = payment.dateTime
-//            if let icon = payment.icon,
-//               let type = payment.type,
-//               let note = payment.note,
-//               let amountMoney = payment.amountMoney
-//            {
-//                print("\(dateTime) \(icon) \(type) \(note) \(amountMoney) \(paymentMethod)")
-//            }
-//        }
-        
-        
+        let rightBarItem: UIBarButtonItem = {
+            let bt = UIBarButtonItem(image: UIImage(systemName: "plus"), style: .plain, target: self, action: #selector(rightBarItemAction))
+            return bt
+        }()
+        navigationItem.rightBarButtonItem = rightBarItem
+    }
+    
+    @objc func rightBarItemAction() {
+        let createdDate = Date()
+        if groupedPaymentsDictionary[createdDate.humanReadableDate] != nil {
+        } else {
+            groupedPaymentsDictionary[createdDate.humanReadableDate] = []
+        }
+        groupedPaymentsDictionary[createdDate.humanReadableDate]!.insert(
+            Payment(
+                icon: "☕️",
+                type: "type",
+                note: "note",
+                dateTime: createdDate,
+                amountMoney: "0",
+                paymentMethod: .none
+            ),
+            at: 0
+        )
+        sortedGroupedPaymentsDictionary = groupedPaymentsDictionary.sorted(by: { $0.0 > $1.0 })
+        preapreDataForCollection()
+        applySnapshot()
+        Ledger(payments: self.flatPaymentsArray).store()
+    }
+    
+    
+    // MARK: - Mini tasks
+    func prepareData() {
+        prepareDataForSnapshot()
+        preapreDataForCollection()
+    }
+    func prepareDataForSnapshot() {
+        groupedPaymentsDictionary = Ledger.retrieve().groupByDate()
+        sortedGroupedPaymentsDictionary = groupedPaymentsDictionary.sorted(by: { $0.0 > $1.0 })
+    }
+    func preapreDataForCollection() {
+        groupedPaymentsArray = sortedGroupedPaymentsDictionary.map { $0.1 }
+        flatPaymentsArray = groupedPaymentsArray.flatMap { $0 }
+        numberOfSectionsInADateArray = groupedPaymentsArray.map { $0.count }
+        headerIndexes = Array(repeating: 0, count: numberOfSectionsInADateArray.count)
+        var startHeaderIndex = 0
+        numberOfSectionsInADateArray.enumerated().forEach { (index, numberOfSectionsInADate) in
+            headerIndexes[index] = startHeaderIndex
+            startHeaderIndex += numberOfSectionsInADate
+        }
+        footerIndexes = []
+        footerIndexes.append(flatPaymentsArray.count - 1)
     }
 }
 
+
+
+// MARK: - Tasks
 extension ViewController {
     
-    //   +-----------------------------------------------------+
-    //   | +---------------------------------+  +-----------+  |
-    //   | |                                 |  |           |  |
-    //   | |                                 |  |           |  |
-    //   | |                                 |  |     1     |  |
-    //   | |                                 |  |           |  |
-    //   | |                                 |  |           |  |
-    //   | |                                 |  +-----------+  |
-    //   | |               0                 |                 |
-    //   | |                                 |  +-----------+  |
-    //   | |                                 |  |           |  |
-    //   | |                                 |  |           |  |
-    //   | |                                 |  |     2     |  |
-    //   | |                                 |  |           |  |
-    //   | |                                 |  |           |  |
-    //   | +---------------------------------+  +-----------+  |
-    //   +-----------------------------------------------------+
     
-    func prepareCompositionalLayout(for scrollingBehavior: UICollectionLayoutSectionOrthogonalScrollingBehavior) -> NSCollectionLayoutSection {
+    
+    // MARK: - Prepare
+    func prepareCompositionalLayout(for scrollingBehavior: UICollectionLayoutSectionOrthogonalScrollingBehavior, at section: Int, in environment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection {
         switch scrollingBehavior {
         case .none:
-            let leadingItem = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(
-                widthDimension: .fractionalWidth(1), heightDimension: .fractionalHeight(1.0)))
-            leadingItem.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
-            let orthogonallyScrolls = scrollingBehavior != .none
-            let containerGroupFractionalWidth = orthogonallyScrolls ? CGFloat(0.5) : CGFloat(1.2)
-            let containerGroup = NSCollectionLayoutGroup.horizontal(
-                layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(containerGroupFractionalWidth),
-                                                   heightDimension: .fractionalHeight(0.4)),
-                subitems: [leadingItem])
-            let section = NSCollectionLayoutSection(group: containerGroup)
-            section.orthogonalScrollingBehavior = scrollingBehavior
+            let layoutSection: NSCollectionLayoutSection
+            var configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+            configuration.showsSeparators = false
+            configuration.trailingSwipeActionsConfigurationProvider = { [weak self] (indexPath) in
+                guard let self = self else { return nil }
+                return self.trailingSwipeActionConfigurationForListCellItem(indexPath)
+            }
+            layoutSection = NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
+            layoutSection.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
             
-            let sectionHeader = NSCollectionLayoutBoundarySupplementaryItem(
-                layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                                   heightDimension: .estimated(44)),
-                elementKind: ViewController.headerElementKind,
-                alignment: .top)
-            section.boundarySupplementaryItems = [sectionHeader]
-            return section
+            var boundarySupplementaryItems: [NSCollectionLayoutBoundarySupplementaryItem] = []
+            if (headerIndexes.contains(section)) {
+                let sectionHeader = NSCollectionLayoutBoundarySupplementaryItem(
+                    layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
+                                                       heightDimension: .estimated(60)),
+                    elementKind: ViewController.headerElementKind,
+                    alignment: .top)
+                boundarySupplementaryItems.append(sectionHeader)
+            }
+            if (footerIndexes.contains(section)) {
+                let sectionFooter = NSCollectionLayoutBoundarySupplementaryItem(
+                    layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
+                                                       heightDimension: .estimated(60)),
+                    elementKind: ViewController.footerElementKind,
+                    alignment: .bottom)
+                boundarySupplementaryItems.append(sectionFooter)
+            }
+            layoutSection.boundarySupplementaryItems = boundarySupplementaryItems
+            return layoutSection
+            do {
+                //            let item = NSCollectionLayoutItem(
+                //                layoutSize: NSCollectionLayoutSize(
+                //                    widthDimension: .fractionalWidth(1.0),
+                //                    heightDimension: .estimated(120)
+                //                )
+                //            )
+                //            item.contentInsets = NSDirectionalEdgeInsets(
+                //                top: 10,
+                //                leading: 10,
+                //                bottom: 10,
+                //                trailing: 10
+                //            )
+                //            let containerGroup = NSCollectionLayoutGroup.horizontal(
+                //                layoutSize: NSCollectionLayoutSize(
+                //                    widthDimension: .fractionalWidth(1.0),
+                //                    heightDimension: .absolute(item.layoutSize.heightDimension.dimension + 12)
+                //                ),
+                //                subitems: [item]
+                //            )
+                //            let section = NSCollectionLayoutSection(group: containerGroup)
+                //            section.orthogonalScrollingBehavior = scrollingBehavior
+                //            let sectionHeader = NSCollectionLayoutBoundarySupplementaryItem(
+                //                layoutSize: NSCollectionLayoutSize(
+                //                    widthDimension: .fractionalWidth(1.0),
+                //                    heightDimension: .estimated(44)
+                //                ),
+                //                elementKind: ViewController.headerElementKind,
+                //                alignment: .top
+                //            )
+                //            section.boundarySupplementaryItems = [sectionHeader]
+                //            return section
+            }
         default:
-            let leadingItem = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(
-                widthDimension: .fractionalWidth(0.7), heightDimension: .fractionalHeight(1.0)))
-            leadingItem.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
-            
-            let trailingItem = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(
-                widthDimension: .fractionalWidth(1.0), heightDimension: .fractionalHeight(0.3)))
-            trailingItem.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
-            let trailingGroup = NSCollectionLayoutGroup.vertical(layoutSize: NSCollectionLayoutSize(
-                widthDimension: .fractionalWidth(0.3), heightDimension: .fractionalHeight(1.0)), subitems: [trailingItem])
-            
-            let orthogonallyScrolls = scrollingBehavior != .none
-            let containerGroupFractionalWidth = orthogonallyScrolls ? CGFloat(0.85) : CGFloat(1.0)
-            let containerGroup = NSCollectionLayoutGroup.horizontal(
-                layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(containerGroupFractionalWidth),
-                                                   heightDimension: .fractionalHeight(0.4)),
-                subitems: [leadingItem, trailingGroup])
-            let section = NSCollectionLayoutSection(group: containerGroup)
-            section.orthogonalScrollingBehavior = scrollingBehavior
-            
-            let sectionHeader = NSCollectionLayoutBoundarySupplementaryItem(
-                layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                                   heightDimension: .estimated(44)),
-                elementKind: ViewController.headerElementKind,
-                alignment: .top)
-            section.boundarySupplementaryItems = [sectionHeader]
-            return section
+            do {
+                let leadingItem = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(0.7), heightDimension: .fractionalHeight(1.0)))
+                leadingItem.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+                
+                let trailingItem = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1.0), heightDimension: .fractionalHeight(0.3)))
+                trailingItem.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+                let trailingGroup = NSCollectionLayoutGroup.vertical(layoutSize: NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(0.3), heightDimension: .fractionalHeight(1.0)), subitems: [trailingItem])
+                
+                let orthogonallyScrolls = scrollingBehavior != .none
+                let containerGroupFractionalWidth = orthogonallyScrolls ? CGFloat(0.85) : CGFloat(1.0)
+                let containerGroup = NSCollectionLayoutGroup.horizontal(
+                    layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(containerGroupFractionalWidth),
+                                                       heightDimension: .fractionalHeight(0.4)),
+                    subitems: [leadingItem, trailingGroup])
+                let section = NSCollectionLayoutSection(group: containerGroup)
+                section.orthogonalScrollingBehavior = scrollingBehavior
+                
+                let sectionHeader = NSCollectionLayoutBoundarySupplementaryItem(
+                    layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
+                                                       heightDimension: .estimated(44)),
+                    elementKind: ViewController.headerElementKind,
+                    alignment: .top)
+                section.boundarySupplementaryItems = [sectionHeader]
+                return section
+            }
         }
     }
     
-    func createLayout() -> UICollectionViewLayout {
-        
-        let config = UICollectionViewCompositionalLayoutConfiguration()
-        config.interSectionSpacing = 20
-        
-        let layout = UICollectionViewCompositionalLayout(sectionProvider: {
-            (sectionIndex: Int, layoutEnvironment: NSCollectionLayoutEnvironment) -> NSCollectionLayoutSection? in
-            guard let sectionKind = SectionKind(rawValue: sectionIndex) else { fatalError("unknown section kind") }
-            return self.prepareCompositionalLayout(for: sectionKind.orthogonalScrollingBehavior())
-        }, configuration: config)
-        return layout
+    
+    
+    func trailingSwipeActionConfigurationForListCellItem(_ indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let sec = indexPath.section
+        let _ = indexPath.row
+        let starAction = UIContextualAction(style: .destructive, title: nil) { [weak self] (_, _, completion) in
+            guard let self = self else {
+                completion(false)
+                return
+            }
+            var ledger = Ledger(payments: self.flatPaymentsArray)
+            ledger.delete(self.flatPaymentsArray[sec]) {
+                self.prepareData()
+                self.applySnapshot()
+            }
+            completion(true)
+        }
+        starAction.image = UIImage(systemName: "trash")
+//        starAction.backgroundColor = .systemBlue
+        return UISwipeActionsConfiguration(actions: [starAction])
     }
 }
 
+
+
+// MARK: - Prepare collection view
 extension ViewController {
     func configureHierarchy() {
+        // configure collection view
         collectionView.collectionViewLayout = createLayout()
         collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        collectionView.backgroundColor = .systemBackground
-        view.addSubview(collectionView)
+        collectionView.backgroundColor = .systemGroupedBackground
+        
+        // collection view delegation
         collectionView.delegate = self
+        
+        // collection view hierarchy
+        view.addSubview(collectionView)
         collectionView.register(UINib(nibName: PaymentCell.reuseIdentifier, bundle: nil), forCellWithReuseIdentifier: PaymentCell.reuseIdentifier)
+        collectionView.register(UINib(nibName: HeaderSupplementaryView.reuseIdentifier, bundle: nil), forSupplementaryViewOfKind: ViewController.headerElementKind, withReuseIdentifier: HeaderSupplementaryView.reuseIdentifier)
+        collectionView.register(UINib(nibName: FooterSupplementaryView.reuseIdentifier, bundle: nil), forSupplementaryViewOfKind: ViewController.footerElementKind, withReuseIdentifier: FooterSupplementaryView.reuseIdentifier)
+    }
+    func createLayout() -> UICollectionViewLayout {
+        let config = UICollectionViewCompositionalLayoutConfiguration()
+        config.interSectionSpacing = 0
+        let layout = UICollectionViewCompositionalLayout(
+            sectionProvider: {(
+                sectionIndex: Int,
+                layoutEnvironment: NSCollectionLayoutEnvironment
+            ) -> NSCollectionLayoutSection? in
+                guard let sectionKind = SectionKind(rawValue: 0) else { fatalError("unknown section kind") }
+                return self.prepareCompositionalLayout(for: sectionKind.orthogonalScrollingBehavior(), at: sectionIndex, in: layoutEnvironment)
+            },
+            configuration: config
+        )
+        return layout
     }
     func configureDataSource() {
-        dataSource = UICollectionViewDiffableDataSource<Int, Int>(collectionView: collectionView) { [self]
-            (collectionView: UICollectionView, indexPath: IndexPath, identifier: Int) -> UICollectionViewCell? in
-            // Return the cell.
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PaymentCell.reuseIdentifier, for: indexPath) as? PaymentCell else { fatalError("Cannot create new cell!") }
-            cell.payment = payments[indexPath.row]
+        dataSource = UICollectionViewDiffableDataSource<Int, Payment>(collectionView: collectionView) { [self]
+            (collectionView: UICollectionView, indexPath: IndexPath, payment: Payment) -> UICollectionViewCell? in
+            guard let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: PaymentCell.reuseIdentifier,
+                for: indexPath) as? PaymentCell else { fatalError("Cannot create new cell!") }
+            cell.payment = payment
+            cell.parentDelegate = self
             return cell
-//            return collectionView.dequeueConfiguredReusableCell(using: cellRegistration, for: indexPath, item: identifier)
         }
         
-        let supplementaryRegistration = UICollectionView.SupplementaryRegistration
-        <TitleSupplementaryView>(elementKind: ViewController.headerElementKind) {
-            (supplementaryView, string, indexPath) in
-            let sectionKind = SectionKind(rawValue: indexPath.section)!
-            supplementaryView.label.text = "." + String(describing: sectionKind)
+        dataSource.supplementaryViewProvider = { [self] (collectionView, elementKind, indexPath) in
+            let sec = indexPath.section
+            let _ = indexPath.row
+            if elementKind == ViewController.headerElementKind {
+                guard let header = collectionView.dequeueReusableSupplementaryView(
+                    ofKind: elementKind,
+                    withReuseIdentifier: HeaderSupplementaryView.reuseIdentifier,
+                    for: indexPath
+                ) as? HeaderSupplementaryView else { fatalError("Cannot create new header!") }
+                header.title.text = flatPaymentsArray[sec].dateTime.humanReadableDate
+                return header
+            }
+            guard let footer = collectionView.dequeueReusableSupplementaryView(
+                ofKind: ViewController.footerElementKind,
+                withReuseIdentifier: FooterSupplementaryView.reuseIdentifier,
+                for: indexPath
+            ) as? FooterSupplementaryView else { fatalError("Cannot create new footer!") }
+            return footer
         }
-        
-        dataSource.supplementaryViewProvider = { (view, kind, index) in
-            return self.collectionView.dequeueConfiguredReusableSupplementary(
-                using: supplementaryRegistration, for: index)
+    }
+    
+    func applySnapshot() {
+        var snapshot = NSDiffableDataSourceSnapshot<Int, Payment>()
+        var numberOfSections = 0
+        for (_, value) in sortedGroupedPaymentsDictionary {
+            let payments = value
+            payments.enumerated().forEach { index, value in
+                snapshot.appendSections([numberOfSections])
+                numberOfSections += 1
+                snapshot.appendItems([value])
+            }
         }
-        
-        // initial data
-        var snapshot = NSDiffableDataSourceSnapshot<Int, Int>()
-//        var identifierOffset = 0 // come with sample
-//        let itemsPerSection = 18
-        
-        /// sample
-//        SectionKind.allCases.forEach {
-//            snapshot.appendSections([$0.rawValue])
-//            let maxIdentifier = identifierOffset + itemsPerSection
-//            snapshot.appendItems(Array(identifierOffset..<maxIdentifier))
-//            identifierOffset += itemsPerSection
-//        }
-        /// custom
-        snapshot.appendSections([0])
-        snapshot.appendItems(Array(0..<payments.count))
-        
-        dataSource.apply(snapshot, animatingDifferences: false)
+        dataSource.apply(snapshot, animatingDifferences: true)
     }
 }
 
+
+
+// MARK: - Delegation
+extension ViewController: DataEnterable {
+    func alertForm(category: Payment.CodingKeys, fieldLabel: UILabel, of cell: PaymentCell) {
+        FeedbackInteraction.tapped(style: .light)
+        let alertController = UIAlertController(
+            title: category.rawValue.uppercased(),
+            message: "message",
+            preferredStyle: .alert
+        )
+        alertController.addTextField()
+        alertController.textFields![0].text = fieldLabel.text
+        let doneAction = UIAlertAction(
+            title: "Done",
+            style: .default
+        ) { [unowned alertController] _ in
+            if alertController.textFields![0].text!.count > 0 {
+                if let index = self.flatPaymentsArray.firstIndex(where: { $0.dateTime == cell.dateTime }) {
+                    switch category {
+                    case .icon:
+                        fieldLabel.text = alertController.textFields![0].text
+                        cell.payment.icon = fieldLabel.text
+                        self.flatPaymentsArray[index].icon = fieldLabel.text
+                        break
+                    case .type:
+                        fieldLabel.text = alertController.textFields![0].text
+                        cell.payment.type = fieldLabel.text
+                        self.flatPaymentsArray[index].type = fieldLabel.text
+                        break
+                    case .note:
+                        fieldLabel.text = alertController.textFields![0].text
+                        cell.payment.note = fieldLabel.text
+                        self.flatPaymentsArray[index].note = fieldLabel.text
+                        break
+                    case .amountMoney:
+                        fieldLabel.text = alertController.textFields![0].text
+                        cell.payment.amountMoney = fieldLabel.text
+                        self.flatPaymentsArray[index].amountMoney = fieldLabel.text
+                        break
+                    case .paymentMethod:
+                        if let paymentMethod = Payment.PaymentMethod(rawValue: alertController.textFields![0].text!) {
+                            fieldLabel.text = alertController.textFields![0].text
+                            cell.payment.paymentMethod = paymentMethod
+                            self.flatPaymentsArray[index].paymentMethod = paymentMethod
+                        }
+                        break
+                    default:
+                        break
+                    }
+                    Ledger(payments: self.flatPaymentsArray).store()
+                }
+            }
+        }
+        
+        alertController.addAction(doneAction)
+        alertController.preferredAction = doneAction
+        self.present(alertController, animated: true)
+    }
+}
+
+
+
+// MARK: - UICollectionViewDelegate
 extension ViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)
     }
 }
 
-extension UIColor {
-    static var cornflowerBlue: UIColor {
-        return UIColor(displayP3Red: 100.0 / 255.0, green: 149.0 / 255.0, blue: 237.0 / 255.0, alpha: 1.0)
-    }
-}
+
+
+

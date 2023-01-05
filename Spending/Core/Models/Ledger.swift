@@ -1,5 +1,5 @@
 //
-//  Payments.swift
+//  Ledger.swift
 //  Spending
 //
 //  Created by Dat Vu on 02/01/2023.
@@ -7,31 +7,47 @@
 
 import Foundation
 
-
-
 // MARK: - Structure definition
-typealias Payment = Payments.Payment
-struct Payments {
-    struct Payment {
-        enum PaymentMethod: String {
-            case none, cash, card, borrow
-        }
-        var icon: String?
-        var type: String?
-        var note: String?
-        var dateTime: Date = Date()
-        var amountMoney: String?
-        var paymentMethod: PaymentMethod = .none
-        
-        enum CodingKeys: String, CodingKey {
-            case icon
-            case type
-            case note
-            case dateTime
-            case amountMoney
-            case paymentMethod
-        }
+struct Payment {
+    enum PaymentMethod: String {
+        case none, cash, card, borrow
     }
+    var icon: String?
+    var type: String?
+    var note: String?
+    var dateTime: Date = Date()
+    var amountMoney: String?
+    var paymentMethod: PaymentMethod = .none
+    
+    enum CodingKeys: String, CodingKey {
+        case icon
+        case type
+        case note
+        case dateTime
+        case amountMoney
+        case paymentMethod
+    }
+    
+    static func < (lhs: Payment, rhs: Payment) -> Bool {
+        return lhs.dateTime < rhs.dateTime
+    }
+    
+    static func == (lhs: Payment, rhs: Payment) -> Bool {
+        return lhs.dateTime == rhs.dateTime
+    }
+    
+    static func > (lhs: Payment, rhs: Payment) -> Bool {
+        return lhs.dateTime > rhs.dateTime
+    }
+}
+extension Payment: Hashable {} // To use UICollectionViewDiffableDataSource
+extension Payment: CustomStringConvertible {
+    var description: String {
+        return "Payment: \(icon ?? "") \(type ?? "") \(note ?? "") \(dateTime) \(amountMoney ?? "") \(paymentMethod.rawValue)"
+    }
+}
+
+struct Ledger {
     var payments: [Payment]
     
     init(payments: [Payment] = []) {
@@ -42,7 +58,7 @@ struct Payments {
 
 
 // MARK: - Apply Codable
-extension Payments: Codable {
+extension Ledger: Codable {
     struct PaymentKey: CodingKey {
         var stringValue: String
         init?(stringValue: String) {
@@ -99,8 +115,8 @@ extension Payments: Codable {
 
 
 
-// MARK: - Store and Retrieve
-extension Payments {
+// MARK: - Data handler
+extension Ledger {
     func store() {
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let paymentsStorageFilePath = dir.appendingPathComponent("Payments")
@@ -115,27 +131,44 @@ extension Payments {
             }
         }
     }
-    static func retrieve() -> Payments {
+    static func retrieve() -> Ledger {
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let paymentsStorageFilePath = dir.appendingPathComponent("Payments")
             print("Retrieve data from payments storage filepath: \(paymentsStorageFilePath)")
             do {
                 let jsonData = try Data(contentsOf: paymentsStorageFilePath)
-                let payments = try JSONDecoder().decode(Payments.self, from: jsonData)
-                return payments
+                let ledger = try JSONDecoder().decode(Ledger.self, from: jsonData)
+                var sortedLedger = ledger
+                sortedLedger.payments = ledger.payments.sorted {
+                    if ($0.dateTime > $1.dateTime) {
+                        return true
+                    }
+                    return false
+                }
+                return sortedLedger
             }
             catch {
                 print("Retrieve payments failed! \(error)")
             }
         }
-        return Payments()
+        return Ledger()
+    }
+    
+    mutating func delete(_ payment: Payment, completion: () -> ()) {
+        payments.remove(at: SearchEngine.binarySearch(in: payments, for: payment))
+        self.store()
+        completion()
+    }
+    
+    func groupByDate() -> Dictionary<String, [Payment]> {
+        return Dictionary(grouping: payments, by: \.dateTime.humanReadableDate)
     }
 }
 
 
 
 // MARK: - Mini tasks
-extension Payments {
+extension Ledger {
     var count: Int {
         return payments.count
     }
@@ -147,6 +180,32 @@ extension Payments {
         set(newValue) {
             // Perform a suitable setting action here.
             payments[index] = newValue
+        }
+    }
+}
+
+
+
+// MARK: - Sample usage Payments storage engine
+func sample() {
+    let store = Ledger(payments: [
+        .init(icon: "car", type: "borrow", note: "Buy my new car", dateTime: Date(), amountMoney: "2000", paymentMethod: .cash),
+        .init(icon: "☕️", type: "Highland", note: "With my friend", dateTime: "2022-12-28 17:30:22 +0000".toDate(), amountMoney: "20", paymentMethod: .card),
+        .init(icon: "☕️", type: "Starbuck", note: "With my boss", dateTime: "2022-12-28 17:30:21 +0000".toDate(), amountMoney: "30", paymentMethod: .cash),
+        .init(icon: "🍕", type: "breakfast", note: "Delecious", dateTime: "2022-12-28 17:30:25 +0000".toDate(), amountMoney: "30", paymentMethod: .cash),
+        .init(icon: "📓", type: "EC", note: "At Uni", dateTime: "2022-12-28 17:30:20 +0000".toDate(), amountMoney: "20", paymentMethod: .cash)
+    ])
+    store.store()
+    let payments = Ledger.retrieve()
+    for payment in payments.payments {
+        let paymentMethod = payment.paymentMethod
+        let dateTime = payment.dateTime
+        if let icon = payment.icon,
+           let type = payment.type,
+           let note = payment.note,
+           let amountMoney = payment.amountMoney
+        {
+            print("\(dateTime) \(icon) \(type) \(note) \(amountMoney) \(paymentMethod)")
         }
     }
 }
