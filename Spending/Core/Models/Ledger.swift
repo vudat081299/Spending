@@ -8,6 +8,7 @@
 import Foundation
 
 // MARK: - Structure definition
+typealias PaymentMethod = Payment.PaymentMethod
 struct Payment {
     enum PaymentMethod: String {
         case none, cash, card, borrow
@@ -17,7 +18,7 @@ struct Payment {
     var note: String?
     var dateTime: Date = Date()
     var amountMoney: String?
-    var paymentMethod: PaymentMethod = .none
+    var paymentMethod: PaymentMethod? = PaymentMethod.none
     
     enum CodingKeys: String, CodingKey {
         case icon
@@ -43,7 +44,7 @@ struct Payment {
 extension Payment: Hashable {} // To use UICollectionViewDiffableDataSource
 extension Payment: CustomStringConvertible {
     var description: String {
-        return "Payment: \(icon ?? "") \(type ?? "") \(note ?? "") \(dateTime) \(amountMoney ?? "") \(paymentMethod.rawValue)"
+        return "Payment: \(icon ?? "") \(type ?? "") \(note ?? "") \(dateTime) \(amountMoney ?? "") \(paymentMethod?.rawValue ?? "")"
     }
 }
 
@@ -89,7 +90,7 @@ extension Ledger: Codable {
             try productContainer.encode(payment.type, forKey: .type)
             try productContainer.encode(payment.note, forKey: .note)
             try productContainer.encode(payment.amountMoney, forKey: .amountMoney)
-            try productContainer.encode(payment.paymentMethod.rawValue, forKey: .paymentMethod)
+            try productContainer.encode(payment.paymentMethod?.rawValue, forKey: .paymentMethod)
         }
     }
     
@@ -106,7 +107,7 @@ extension Ledger: Codable {
             let paymentMethod = try productContainer.decode(String.self, forKey: .paymentMethod)
 
             // The key is used again here and completes the collapse of the nesting that existed in the JSON representation.
-            let payment = Payment(icon: icon, type: type, note: note, dateTime: key.stringValue.toDate(), amountMoney: amountMoney, paymentMethod: Payment.PaymentMethod(rawValue: paymentMethod) ?? .none)
+            let payment = Payment(icon: icon, type: type, note: note, dateTime: key.stringValue.toDate(), amountMoney: amountMoney, paymentMethod: PaymentMethod(rawValue: paymentMethod) ?? PaymentMethod.none)
             payments.append(payment)
         }
         self.init(payments: payments)
@@ -198,14 +199,14 @@ func sample() {
     store.store()
     let payments = Ledger.retrieve()
     for payment in payments.payments {
-        let paymentMethod = payment.paymentMethod
         let dateTime = payment.dateTime
         if let icon = payment.icon,
            let type = payment.type,
            let note = payment.note,
-           let amountMoney = payment.amountMoney
+           let amountMoney = payment.amountMoney,
+           let paymentMethod = payment.paymentMethod
         {
-            print("\(dateTime) \(icon) \(type) \(note) \(amountMoney) \(paymentMethod)")
+            print("\(dateTime) \(icon) \(type) \(note) \(amountMoney) \(paymentMethod.rawValue)")
         }
     }
 }

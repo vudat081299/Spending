@@ -8,7 +8,7 @@
 import UIKit
 
 protocol DataEnterable {
-    func alertForm(category: Payment.CodingKeys, fieldLabel: UILabel, of cell: PaymentCell)
+    func alertForm(category: Payment.CodingKeys, keyPaths: [String: Any], of cell: PaymentCell)
     
 }
 
@@ -53,7 +53,7 @@ class PaymentCell: UICollectionViewCell {
     var cellPayment: CellPayment!
     var payment: Payment {
         get {
-            return Payment(icon: iconName, type: type.text, note: note.text, dateTime: dateTime, amountMoney: amountMoney.text, paymentMethod: Payment.PaymentMethod(rawValue: paymentMethod.text ?? "") ?? .none)
+            return Payment(icon: iconName, type: type.text, note: note.text, dateTime: dateTime, amountMoney: amountMoney.text, paymentMethod: PaymentMethod(rawValue: paymentMethod.text ?? "") ?? PaymentMethod.none)
         }
         set(newValue) {
             cellPayment = CellPayment(iconName: newValue.icon, dateTime: newValue.dateTime, payment: newValue)
@@ -104,23 +104,44 @@ class PaymentCell: UICollectionViewCell {
         }
         time.text = payment.dateTime.humanReadableTime
         iconBackGround.borderOutline(2, color: (HighLightColor(rawValue: (Int(payment.dateTime.humanReadableSecond) ?? 0) % 8)!.color()))
-        paymentMethod.text = payment.paymentMethod.rawValue
+        paymentMethod.text = payment.paymentMethod?.rawValue
+        
     }
     
     @IBAction func enterIcon(_ sender: UIButton) {
-        parentDelegate.alertForm(category: .icon, fieldLabel: icon, of: self)
+        let keyPaths = [
+            "label": \PaymentCell.icon,
+            "fieldInPayment": \PaymentCell.payment.icon
+        ] as [String : Any]
+        parentDelegate.alertForm(category: .icon, keyPaths: keyPaths, of: self)
     }
     
     @objc func enterType(_ sender: UITapGestureRecognizer) {
-        parentDelegate.alertForm(category: .type, fieldLabel: type, of: self)
+        let keyPaths = [
+            "label": \PaymentCell.type,
+            "fieldInPayment": \PaymentCell.payment.type
+        ] as [String : Any]
+        parentDelegate.alertForm(category: .type, keyPaths: keyPaths, of: self)
     }
     @objc func enterNote(_ sender: UITapGestureRecognizer) {
-        parentDelegate.alertForm(category: .note, fieldLabel: note, of: self)
+        let keyPaths = [
+            "label": \PaymentCell.note,
+            "fieldInPayment": \PaymentCell.payment.note
+        ] as [String : Any]
+        parentDelegate.alertForm(category: .note, keyPaths: keyPaths, of: self)
     }
     @objc func enterAmountMoney(_ sender: UITapGestureRecognizer) {
-        parentDelegate.alertForm(category: .amountMoney, fieldLabel: amountMoney, of: self)
+        let keyPaths = [
+            "label": \PaymentCell.amountMoney,
+            "fieldInPayment": \PaymentCell.payment.amountMoney
+        ] as [String : Any]
+        parentDelegate.alertForm(category: .amountMoney, keyPaths: keyPaths, of: self)
     }
     @objc func enterPaymentMethod(_ sender: UITapGestureRecognizer) {
-        parentDelegate.alertForm(category: .paymentMethod, fieldLabel: paymentMethod, of: self)
+        let keyPaths = [
+            "label": \PaymentCell.paymentMethod,
+            "fieldInPayment": \PaymentCell.payment.paymentMethod
+        ] as [String : Any]
+        parentDelegate.alertForm(category: .paymentMethod, keyPaths: keyPaths, of: self)
     }
 }

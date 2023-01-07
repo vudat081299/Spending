@@ -346,7 +346,12 @@ extension ViewController {
 
 // MARK: - Delegation
 extension ViewController: DataEnterable {
-    func alertForm(category: Payment.CodingKeys, fieldLabel: UILabel, of cell: PaymentCell) {
+    func alertForm(category: Payment.CodingKeys, keyPaths: [String: Any], of cell: PaymentCell) {
+        let cellPayment = cell.payment
+        guard let labelKeyPath = keyPaths["label"] as? KeyPath<PaymentCell, UILabel>,
+              let fieldInPaymentKeyPath = keyPaths["fieldInPayment"] as? KeyPath<PaymentCell, Any> else { return }
+        let label = cell[keyPath: labelKeyPath]
+        let fieldInPayment = cell[keyPath: fieldInPaymentKeyPath]
         FeedbackInteraction.tapped(style: .light)
         let alertController = UIAlertController(
             title: category.rawValue.uppercased(),
@@ -354,36 +359,34 @@ extension ViewController: DataEnterable {
             preferredStyle: .alert
         )
         alertController.addTextField()
-        alertController.textFields![0].text = fieldLabel.text
+        alertController.textFields![0].text = label.text
         let doneAction = UIAlertAction(
             title: "Done",
             style: .default
         ) { [unowned alertController] _ in
             if alertController.textFields![0].text!.count > 0 {
+                
                 if let index = self.flatPaymentsArray.firstIndex(where: { $0.dateTime == cell.dateTime }) {
+                    label.text = alertController.textFields![0].text
                     switch category {
                     case .icon:
-                        fieldLabel.text = alertController.textFields![0].text
                         cell.payment.icon = fieldLabel.text
                         self.flatPaymentsArray[index].icon = fieldLabel.text
                         break
                     case .type:
-                        fieldLabel.text = alertController.textFields![0].text
                         cell.payment.type = fieldLabel.text
                         self.flatPaymentsArray[index].type = fieldLabel.text
                         break
                     case .note:
-                        fieldLabel.text = alertController.textFields![0].text
                         cell.payment.note = fieldLabel.text
                         self.flatPaymentsArray[index].note = fieldLabel.text
                         break
                     case .amountMoney:
-                        fieldLabel.text = alertController.textFields![0].text
                         cell.payment.amountMoney = fieldLabel.text
                         self.flatPaymentsArray[index].amountMoney = fieldLabel.text
                         break
                     case .paymentMethod:
-                        if let paymentMethod = Payment.PaymentMethod(rawValue: alertController.textFields![0].text!) {
+                        if let paymentMethod = PaymentMethod(rawValue: alertController.textFields![0].text!) {
                             fieldLabel.text = alertController.textFields![0].text
                             cell.payment.paymentMethod = paymentMethod
                             self.flatPaymentsArray[index].paymentMethod = paymentMethod
